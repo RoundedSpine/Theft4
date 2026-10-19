@@ -38,3 +38,18 @@ Status: source interface inspection; no renderer behavior changed.
 
 ## Design decision
 Prefer an optional native host effect over a Windows ASI loader. A direct HLSL copy is not yet safe because shader constants, texture bindings and depth encoding are game/renderer-specific.
+
+## Phase 2 discovery — existing native implementation
+Theft4 already includes a sun-shaft implementation and FusionFix-referenced prepass. Do NOT add a duplicate shader or render chain.
+- `ios/bridge/theft4_host_program.h`: `HostProgram::SunShafts` / `gta4_native_sun_shafts_ps`, 80 constant bytes, 7 texture slots.
+- `ios/bridge/theft4_postfx_plan.cpp`: `AppendSunShafts` allocates half-resolution pre/ping/pong, full-resolution output, runs four host passes, and copies back into the scene.
+- `glue/rexglue-sdk-main/src/graphics/gta4_native/sun_shafts_pass.cpp`: `BuildSunShaftParameters` consumes environmental sun direction/color, view-projection and camera altitude, with 24 samples and FusionFix-derived default values.
+- `LibertyRecomp/gpu/shader/hlsl/sunshafts_prepass_ps.hlsl`: FusionFix-referenced sky/depth/brightness mask.
+- Separate Vulkan-side implementation exists; do not confuse it with the native Metal host path.
+
+### Revised next steps
+1. Trace call sites of `AppendSunShafts` and ensure its activation condition and environment-data validity are correct.
+2. Inspect `SunConstants` layout and the native host shader's texture/constant ABI for compatibility.
+3. Confirm the depth texture is correctly populated, sampled, and interpreted on Metal; inspect cloud masking and compare with FusionFix.
+4. Identify existing settings controlling sun shafts and establish whether the feature is active in the iOS runtime.
+5. Add targeted validation/tests for existing pipeline rather than another implementation; only modify behavior when a verified gap is found.
